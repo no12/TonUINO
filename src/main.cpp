@@ -1,3 +1,4 @@
+#include <Arduino.h>
 #include <DFMiniMp3.h>
 #include <EEPROM.h>
 #include <JC_Button.h>
@@ -48,6 +49,14 @@ bool checkTwo(uint8_t a[], uint8_t b[]);
 void writeCard(NfcTagObject nfcTag);
 void dump_byte_array(byte *buffer, byte bufferSize);
 void adminMenu(bool fromCard = false);
+void setstandbyTimer();
+void playFolder();
+bool readCard(NfcTagObject *nfcTag);
+bool askCode(uint8_t *code);
+void setupCard();
+bool setupFolder(FolderSettings *theFolder);
+void resetCard();
+void playShortCut(uint8_t shortCut);
 bool knownCard = false;
 
 // implement a notification class,
