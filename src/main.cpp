@@ -6,6 +6,10 @@
 #include <SoftwareSerial.h>
 #include <avr/sleep.h>
 
+#include "AdminSettings.h"
+#include "NfcTagObject.h"
+#include "FolderSettings.h"
+
 /*
    _____         _____ _____ _____ _____
   |_   _|___ ___|  |  |     |   | |     |
@@ -30,46 +34,9 @@ uint16_t firstTrack;
 uint8_t queue[255];
 uint8_t volume;
 
-struct folderSettings
-{
-  uint8_t folder;
-  uint8_t mode;
-  uint8_t special;
-  uint8_t special2;
-};
-
-// this object stores nfc tag data
-struct nfcTagObject
-{
-  uint32_t cookie;
-  uint8_t version;
-  folderSettings nfcFolderSettings;
-  //  uint8_t folder;
-  //  uint8_t mode;
-  //  uint8_t special;
-  //  uint8_t special2;
-};
-
-// admin settings stored in eeprom
-struct adminSettings
-{
-  uint32_t cookie;
-  byte version;
-  uint8_t maxVolume;
-  uint8_t minVolume;
-  uint8_t initVolume;
-  uint8_t eq;
-  bool locked;
-  long standbyTimer;
-  bool invertVolumeButtons;
-  folderSettings shortCuts[4];
-  uint8_t adminMenuLocked;
-  uint8_t adminMenuPin[4];
-};
-
-adminSettings mySettings;
-nfcTagObject myCard;
-folderSettings *myFolder;
+AdminSettings mySettings;
+NfcTagObject myCard;
+FolderSettings *myFolder;
 unsigned long sleepAtMillis = 0;
 static uint16_t _lastTrackFinished;
 
@@ -78,7 +45,7 @@ uint8_t voiceMenu(int numberOfOptions, int startMessage, int messageOffset,
                   bool preview = false, int previewFromFolder = 0, int defaultValue = 0, bool exitWithLongPress = false);
 bool isPlaying();
 bool checkTwo(uint8_t a[], uint8_t b[]);
-void writeCard(nfcTagObject nfcTag);
+void writeCard(NfcTagObject nfcTag);
 void dump_byte_array(byte *buffer, byte bufferSize);
 void adminMenu(bool fromCard = false);
 bool knownCard = false;
@@ -276,7 +243,7 @@ public:
   {
     return false;
   }
-  virtual bool handleRFID(nfcTagObject *newCard)
+  virtual bool handleRFID(NfcTagObject *newCard)
   {
     return false;
   }
@@ -400,7 +367,7 @@ public:
     Serial.println(F("== Locked::handleVolumeDown() -> LOCKED!"));
     return true;
   }
-  virtual bool handleRFID(nfcTagObject *newCard)
+  virtual bool handleRFID(NfcTagObject *newCard)
   {
     Serial.println(F("== Locked::handleRFID() -> LOCKED!"));
     return true;
@@ -461,7 +428,7 @@ public:
 class KindergardenMode : public Modifier
 {
 private:
-  nfcTagObject nextCard;
+  NfcTagObject nextCard;
   bool cardQueued = false;
 
 public:
@@ -497,7 +464,7 @@ public:
     Serial.println(F("== KindergardenMode::handlePreviousButton() -> LOCKED!"));
     return true;
   }
-  virtual bool handleRFID(nfcTagObject *newCard)
+  virtual bool handleRFID(NfcTagObject *newCard)
   { // lot of work to do!
     Serial.println(F("== KindergardenMode::handleRFID() -> queued!"));
     this->nextCard = *newCard;
@@ -581,7 +548,7 @@ public:
     Serial.println(F("== FeedbackModifier::handleVolumeUp()!"));
     return false;
   }
-  virtual bool handleRFID(nfcTagObject *newCard)
+  virtual bool handleRFID(NfcTagObject *newCard)
   {
     Serial.println(F("== FeedbackModifier::handleRFID()"));
     return false;
@@ -1391,7 +1358,7 @@ void adminMenu(bool fromCard = false)
   else if (subMenu == 6)
   {
     // create modifier card
-    nfcTagObject tempCard;
+    NfcTagObject tempCard;
     tempCard.cookie = cardCookie;
     tempCard.version = 1;
     tempCard.nfcFolderSettings.folder = 0;
@@ -1474,7 +1441,7 @@ void adminMenu(bool fromCard = false)
   {
     // Create Cards for Folder
     // Ordner abfragen
-    nfcTagObject tempCard;
+    NfcTagObject tempCard;
     tempCard.cookie = cardCookie;
     tempCard.version = 1;
     tempCard.nfcFolderSettings.mode = 4;
@@ -1736,7 +1703,7 @@ void resetCard()
   setupCard();
 }
 
-bool setupFolder(folderSettings *theFolder)
+bool setupFolder(FolderSettings *theFolder)
 {
   // Ordner abfragen
   theFolder->folder = voiceMenu(99, 301, 0, true, 0, 0, true);
@@ -1777,7 +1744,7 @@ void setupCard()
 {
   mp3.pause();
   Serial.println(F("=== setupCard()"));
-  nfcTagObject newCard;
+  NfcTagObject newCard;
   if (setupFolder(&newCard.nfcFolderSettings) == true)
   {
     // Karte ist konfiguriert -> speichern
@@ -1789,9 +1756,9 @@ void setupCard()
   }
   delay(1000);
 }
-bool readCard(nfcTagObject *nfcTag)
+bool readCard(NfcTagObject *nfcTag)
 {
-  nfcTagObject tempCard;
+  NfcTagObject tempCard;
   // Show some details of the PICC (that is: the tag/card)
   Serial.print(F("Card UID:"));
   dump_byte_array(mfrc522.uid.uidByte, mfrc522.uid.size);
@@ -1992,7 +1959,7 @@ bool readCard(nfcTagObject *nfcTag)
     }
     else
     {
-      memcpy(nfcTag, &tempCard, sizeof(nfcTagObject));
+      memcpy(nfcTag, &tempCard, sizeof(NfcTagObject));
       Serial.println(nfcTag->nfcFolderSettings.folder);
       myFolder = &nfcTag->nfcFolderSettings;
       Serial.println(myFolder->folder);
@@ -2001,12 +1968,12 @@ bool readCard(nfcTagObject *nfcTag)
   }
   else
   {
-    memcpy(nfcTag, &tempCard, sizeof(nfcTagObject));
+    memcpy(nfcTag, &tempCard, sizeof(NfcTagObject));
     return true;
   }
 }
 
-void writeCard(nfcTagObject nfcTag)
+void writeCard(NfcTagObject nfcTag)
 {
   MFRC522::PICC_Type mifareType;
   byte buffer[16] = {0x13, 0x37, 0xb3, 0x47, // 0x1337 0xb347 magic cookie to
